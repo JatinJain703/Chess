@@ -1,7 +1,11 @@
 {
   "name": "chess",
   "private": true,
-  "workspaces": ["backend", "ws"],
+  "workspaces": [
+    "backend",
+    "ws",
+    "Chess-cli"
+  ],
   "devDependencies": {
     "prisma": "^6.19.2"
   }
