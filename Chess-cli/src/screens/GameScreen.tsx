@@ -14,7 +14,7 @@ export default function GameScreen({
     ws,
     gameInfo,
     fen,
-    goTo
+    goTo,
 }: {
     ws: WebSocket | null;
     gameInfo: GameInfo;
@@ -24,56 +24,55 @@ export default function GameScreen({
     const [chess] = useState(() => new Chess());
     const [moveInput, setMoveInput] = useState("");
     const [error, setError] = useState("");
-    const [inputMode, setInputMode] = useState(false); // ← toggle between nav and input
+    const [inputMode, setInputMode] = useState(false);
+    const [turn, setTurn] = useState<"w" | "b">("w");
 
-    // update board when fen changes from server
     useEffect(() => {
-        if (fen) chess.load(fen);
+        if (fen) {
+            chess.load(fen);
+            setTurn(chess.turn());
+        }
     }, [fen]);
+
+    useEffect(() => {
+        if (!ws) return;
+        const handler = (e: MessageEvent) => {
+            const data = JSON.parse(e.data);
+            if (data.type === "invalid_move") setError("✖ Invalid move — try again");
+            if (data.type === "move") setError("");
+        };
+        ws.addEventListener("message", handler);
+        return () => ws.removeEventListener("message", handler);
+    }, [ws]);
+
+    const myTurn =
+        (gameInfo.color === "white" && turn === "w") ||
+        (gameInfo.color === "black" && turn === "b");
 
     useInput((input, key) => {
         if (inputMode) {
-            if (key.escape) {
-                setInputMode(false);
-                setMoveInput("");
-                setError("");
-            } else if (key.return) {
-                sendMove();
-            } else if (key.backspace || key.delete) {
-                setMoveInput(m => m.slice(0, -1));
-            } else if (input && !key.ctrl) {
-                setMoveInput(m => m + input);
-            }
+            if (key.escape) { setInputMode(false); setMoveInput(""); setError(""); }
+            else if (key.return) { sendMove(); }
+            else if (key.backspace || key.delete) { setMoveInput((m) => m.slice(0, -1)); }
+            else if (input && !key.ctrl) { setMoveInput((m) => m + input); }
         } else {
-            if (input === "m") setInputMode(true);  // ← press M to enter move
-            if (input === "r") {
-                ws?.send(JSON.stringify({ type: "resign" }));
-            }
+            if (input === "m" && myTurn) setInputMode(true);
+            if (input === "r") ws?.send(JSON.stringify({ type: "resign" }));
         }
     });
 
     const sendMove = () => {
-        if (moveInput.length < 4) {
-            setError("Enter move like: e2e4");
-            return;
-        }
-
+        if (moveInput.length < 4) { setError("✖ Format: e2e4"); return; }
         const from = moveInput.slice(0, 2);
         const to = moveInput.slice(2, 4);
-
-        ws?.send(JSON.stringify({
-            type: "move",
-            payload: { from, to }
-        }));
-
+        ws?.send(JSON.stringify({ type: "move", payload: { from, to } }));
         setMoveInput("");
         setInputMode(false);
-        setError("");
     };
 
+    // exact same board render as original code
     const renderBoard = () => {
         const board = chess.board();
-        // flip board if black
         const rows = gameInfo.color === "black" ? [...board].reverse() : board;
 
         return rows.map((row, rowIdx) => {
@@ -82,19 +81,19 @@ export default function GameScreen({
 
             return (
                 <Box key={rowIdx}>
-                    <Text dimColor>{rank} </Text>
+                    <Text color="yellow" dimColor>{rank} </Text>
                     {cols.map((cell, colIdx) => {
                         const isLight = (rowIdx + colIdx) % 2 === 0;
-                        const piece = cell ? PIECES[cell.color === "w"
-                            ? cell.type.toUpperCase()
-                            : cell.type.toLowerCase()] ?? " "
+                        const piece = cell
+                            ? (PIECES[cell.color === "w"
+                                ? cell.type.toUpperCase()
+                                : cell.type.toLowerCase()] ?? " ")
                             : " ";
-
                         return (
                             <Text
                                 key={colIdx}
                                 backgroundColor={isLight ? "white" : "gray"}
-                                color={cell?.color === "w" ? "blue" : "red"}
+                                color={cell ? (cell.color === "w" ? "blue" : "magenta") : undefined}
                             >
                                 {` ${piece} `}
                             </Text>
@@ -106,50 +105,102 @@ export default function GameScreen({
     };
 
     const files = gameInfo.color === "black" ? [...FILES].reverse() : FILES;
+    const underline = "─".repeat(48);
 
     return (
-        <Box flexDirection="row" marginTop={1} gap={4}>
-            {/* Board */}
-            <Box flexDirection="column">
-                {renderBoard()}
-                <Box>
-                    <Text>  </Text>
-                    {files.map(f => <Text key={f} dimColor>{` ${f} `}</Text>)}
+        <Box
+            flexDirection="column"
+            alignItems="center"
+            justifyContent="center"
+            marginTop={2}
+            marginBottom={2}
+        >
+            <Box
+                flexDirection="column"
+                borderStyle="round"
+                borderColor="yellow"
+                paddingX={3}
+                paddingY={2}
+                width={62}
+            >
+                {/* Top pieces */}
+                <Box justifyContent="space-between" marginBottom={1}>
+                    <Text color="yellow">♔ ♕ ♖</Text>
+                    <Text color="yellow">♖ ♕ ♔</Text>
                 </Box>
-            </Box>
 
-            {/* Side Panel */}
-            <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={2} paddingY={1} width={30}>
-                <Text bold color="cyan">Game Info</Text>
-                <Box marginTop={1} flexDirection="column">
-                    <Text>⬜ {gameInfo.whiteplayer}</Text>
-                    <Text>⬛ {gameInfo.blackplayer}</Text>
+                {/* Players */}
+                <Box justifyContent="space-between" marginBottom={1}>
+                    <Box>
+                        <Text color="white">♔ </Text>
+                        <Text color="white">{gameInfo.whiteplayer}</Text>
+                    </Box>
+                    <Text color="yellow" dimColor>vs</Text>
+                    <Box>
+                        <Text color="yellow">♟ </Text>
+                        <Text color="yellow">{gameInfo.blackplayer}</Text>
+                    </Box>
                 </Box>
 
-                <Box marginTop={1}>
-                    <Text dimColor>You are </Text>
-                    <Text color={gameInfo.color === "white" ? "white" : "gray"} bold>
-                        {gameInfo.color}
+                {/* Board */}
+                <Box flexDirection="column" alignItems="center" marginBottom={1}>
+                    {renderBoard()}
+                    <Box>
+                        <Text>{"   "}</Text>
+                        {files.map((f) => (
+                            <Text key={f} color="yellow" dimColor>{` ${f} `}</Text>
+                        ))}
+                    </Box>
+                </Box>
+
+                {/* Divider */}
+                <Box justifyContent="center" marginBottom={1}>
+                    <Text color="yellow" dimColor>{underline}</Text>
+                </Box>
+
+                {/* Turn */}
+                <Box justifyContent="center" marginBottom={1}>
+                    <Text dimColor>Turn  </Text>
+                    <Text color={turn === "w" ? "white" : "yellow"} bold>
+                        {turn === "w" ? "♔ White" : "♟ Black"}
+                    </Text>
+                    <Text color={myTurn ? "yellow" : "gray"}>
+                        {myTurn ? "  ← your turn" : "  waiting..."}
                     </Text>
                 </Box>
 
-                <Box marginTop={1} flexDirection="column">
-                    <Text bold color="cyan">Move Input</Text>
-                    {inputMode ? (
-                        <Box borderStyle="single" borderColor="cyan" paddingX={1} marginTop={1}>
-                            <Text color="cyan">{moveInput}<Text color="cyan">_</Text></Text>
-                        </Box>
-                    ) : (
-                        <Text dimColor>Press M to enter move</Text>
-                    )}
-                    {error && <Text color="red">{error}</Text>}
+                {/* Move input */}
+                <Box>
+                    <Text color={myTurn ? "yellow" : "gray"}>
+                        {inputMode ? "▶ " : "  "}Move
+                    </Text>
+                </Box>
+                <Box width={54} marginLeft={2}>
+                    {inputMode
+                        ? <Text color="yellow">{moveInput}_</Text>
+                        : <Text dimColor>{myTurn ? "Press M to enter move" : "Wait for your turn..."}</Text>
+                    }
+                </Box>
+                <Box marginBottom={1}>
+                    <Text color={inputMode ? "yellow" : "gray"}>{underline}</Text>
                 </Box>
 
-                <Box marginTop={2} flexDirection="column">
-                    <Text dimColor>M - enter move</Text>
-                    <Text dimColor>R - resign</Text>
-                    <Text dimColor>Esc - cancel input</Text>
-                    <Text dimColor>Format: e2e4</Text>
+                {/* Error — always one row */}
+                <Box marginBottom={1}>
+                    <Text color={error ? "red" : "yellow"} dimColor={!error}>
+                        {error || " "}
+                    </Text>
+                </Box>
+
+                {/* Help */}
+                <Box justifyContent="center" marginBottom={1}>
+                    <Text dimColor>M move  R resign  Esc cancel  fmt: e2e4</Text>
+                </Box>
+
+                {/* Bottom pieces */}
+                <Box justifyContent="space-between">
+                    <Text color="yellow">♚ ♛ ♜</Text>
+                    <Text color="yellow">♜ ♛ ♚</Text>
                 </Box>
             </Box>
         </Box>
