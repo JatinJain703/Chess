@@ -20,7 +20,7 @@ router.post("/login", async (req, res) => {
     })
   }catch(e:any)
   {
-     res.status(500).json({
+    return res.status(500).json({
                 message: "something wrong in server"
             });
   }
@@ -41,7 +41,7 @@ router.post("/login", async (req, res) => {
     const token = jwt.sign({
         id: user.id
     }, JWT_SECRET)
-    res.json({
+   return res.json({
         token: token,
         message: "you are logged in"
     })
