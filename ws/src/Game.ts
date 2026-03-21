@@ -1,6 +1,6 @@
 import { Chess } from "chess.js";
 import WebSocket from "ws";
-import { MOVE, GAME_OVER } from "./messages.js";
+import { MOVE, GAME_OVER, INVALID_MOVE } from "./messages.js";
 interface User {
     id: number,
     socket: WebSocket
@@ -42,13 +42,13 @@ export class Game {
         if (this.endTime === null) return;
         try {
             const existing = await prisma.game.findUnique({
-            where: { id: gameId }
-        });
+                where: { id: gameId }
+            });
 
-        if (existing) {
-            console.log("Game already stored, skipping...");
-            return;
-        }
+            if (existing) {
+                console.log("Game already stored, skipping...");
+                return;
+            }
             const savedgame = await prisma.game.create({
                 data: {
                     id: gameId,
@@ -99,25 +99,41 @@ export class Game {
             this.moveCount++;
             this.fenHistory.push(this.board.fen());
             console.log("Move made:", move);
+            this.whiteplayer.socket.send(
+                JSON.stringify({
+                    type: MOVE,
+                    payload: move,
+                    fen: this.board.fen(),
+                    turn: this.board.turn()
+                })
+            );
+            this.blackplayer.socket.send(
+                JSON.stringify({
+                    type: MOVE,
+                    payload: move,
+                    fen: this.board.fen(),
+                    turn: this.board.turn()
+                })
+            );
         } catch (e) {
             console.log("Invalid move attempted:", move, "Error:", e);
+            this.whiteplayer.socket.send(
+                JSON.stringify({
+                    type: INVALID_MOVE,
+                    turn: this.board.turn()
+
+                })
+            );
+            this.blackplayer.socket.send(
+                JSON.stringify({
+                    type: INVALID_MOVE,
+                    turn: this.board.turn()
+                })
+            );
             return;
         }
 
-        this.whiteplayer.socket.send(
-            JSON.stringify({
-                type: MOVE,
-                payload: move,
-                fen: this.board.fen()
-            })
-        );
-        this.blackplayer.socket.send(
-            JSON.stringify({
-                type: MOVE,
-                payload: move,
-                fen: this.board.fen()
-            })
-        );
+
 
         if (this.board.isGameOver()) {
             if (this.endTime !== null) return;
@@ -149,7 +165,7 @@ export class Game {
         }
     }
     async makeresign(Socket: WebSocket, gameId: string) {
-        if (this.endTime !== null) return;  
+        if (this.endTime !== null) return;
         this.endTime = new Date();
         const opponent =
             Socket === this.whiteplayer.socket ? this.blackplayer : this.whiteplayer;
