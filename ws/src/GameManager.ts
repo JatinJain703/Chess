@@ -3,6 +3,7 @@ import WebSocket from "ws";
 import { INIT_GAME, MOVE, REGISTER_USER, RESIGN, REMOVE, CREATE, JOIN, LEAVE, START } from "./messages.js";
 import { v4 as uuidv4 } from "uuid";
 interface User {
+    name: string,
     id: number,
     socket: WebSocket
 }
@@ -25,8 +26,17 @@ export class GameManager {
         this.pendinggames = [];
     }
 
-    addUser(Socket: WebSocket) {
-        this.addHandler(Socket);
+    async addUser(Socket: WebSocket, id: number, name: string) {
+        const alreadyuser = this.Users.find(u => u.id === id)
+        if (alreadyuser) {
+            alreadyuser.socket = Socket;
+            await this.handlereconnect(alreadyuser);
+            return;
+        }
+        else {
+            this.Users.push({ name: name, id: id, socket: Socket })
+        }
+        this.addHandler(Socket, id, name);
     }
 
     removeUser(Socket: WebSocket) {
@@ -57,26 +67,21 @@ export class GameManager {
             fenHistory: game.fenHistory
         }));
     }
-    private addHandler(Socket: WebSocket) {
+    private addHandler(Socket: WebSocket, id: number, name: string) {
         Socket.on("message", async (data) => {
-            const message = JSON.parse(data.toString());
-            if (message.type === REGISTER_USER) {
-                const alreadyuser = this.Users.find(u => u.id === message.UserId)
-                if (alreadyuser) {
-                    alreadyuser.socket = Socket;
-                    await this.handlereconnect(alreadyuser);
-                    return;
-                }
-                else {
-                    this.Users.push({ id: message.UserId, socket: Socket })
-                }
+            let message;
+            try {
+                message = JSON.parse(data.toString());
+            } catch {
+                return;
             }
             if (message.type === INIT_GAME) {
+                console.log("Init game request received from user:", name);
                 const user = this.Users.find(u => u.socket === Socket)
                 if (!user)
                     return;
 
-                if (this.pendinguser) {
+                if (this.pendinguser && this.pendinguser.id !== user.id) {
                     const gameId = uuidv4();
                     const pendingUser = this.pendinguser;
                     const game = new Game(this.pendinguser, user, gameId, async (endedId) => {
@@ -84,6 +89,19 @@ export class GameManager {
                         console.log(`Game ${endedId} removed from active games`);
                     });
                     this.games.push(game);
+                    game.whiteplayer.socket.send(JSON.stringify({
+                        type: "GAME_START",
+                        gameid:gameId,
+                        whiteplayer: "You",
+                        blackplayer: user.name
+                    }));
+
+                    game.blackplayer.socket.send(JSON.stringify({
+                        type: "GAME_START",
+                        gameid:gameId,
+                        whiteplayer: pendingUser.name,
+                        blackplayer: "You"
+                    }));
                     this.pendinguser = null;
                 }
                 else {
@@ -91,7 +109,9 @@ export class GameManager {
                 }
             }
             if (message.type === REMOVE) {
+                console.log("Remove from queue:", id);
                 if (this.pendinguser?.socket === Socket) {
+                    Socket.send(JSON.stringify({ message: "Removed from queue" }));
                     this.pendinguser = null
                 }
             }
@@ -99,10 +119,11 @@ export class GameManager {
                 const gameId = uuidv4();
                 const pendinggame = {
                     gameid: gameId,
-                    createdby: ({ id: message.UserId, socket: Socket }),
+                    createdby: ({ id: id, socket: Socket, name: name }),
                     players: [{
-                        id: message.UserId,
-                        socket: Socket
+                        id: id,
+                        socket: Socket,
+                        name: name
                     }]
                 };
                 this.pendinggames.push(pendinggame);
@@ -125,7 +146,10 @@ export class GameManager {
                     }))
                     return;
                 }
-                game.players.push({ id: message.UserId, socket: Socket })
+                if (game.players.find(p => p.id === id)) {
+                    return;
+                }
+                game.players.push({ id: id, socket: Socket, name: name });
                 for (let i = 0; i < game.players.length; i++) {
                     game.players[i]?.socket.send(JSON.stringify({
                         gameid: game.gameid,
@@ -151,6 +175,14 @@ export class GameManager {
             }
             if (message.type === START) {
                 const pendinggame = this.pendinggames.find(g => g.gameid === message.gameid);
+                if (!pendinggame) {
+                    Socket.send(JSON.stringify({ message: "Game not found" }));
+                    return;
+                }
+                if (pendinggame.players.length < 2) {
+                    Socket.send(JSON.stringify({ message: "Not enough players" }));
+                    return;
+                }
                 this.pendinggames = this.pendinggames.filter(g => g.gameid !== message.gameid);
                 const whiteplayer = pendinggame!.players[0]!;
                 const blackplayer = pendinggame!.players[1]!;
@@ -158,23 +190,41 @@ export class GameManager {
                     this.games = this.games.filter(g => g.gameId !== endedId);
                     console.log(`Game ${endedId} removed from active games`);
                 });
+                whiteplayer.socket.send(JSON.stringify({
+                    type: "GAME_START",
+                    gameid: message.gameid,
+                    whiteplayer: "You",
+                    blackplayer: blackplayer.name
+                }));
+
+                blackplayer.socket.send(JSON.stringify({
+                    type: "GAME_START",
+                    gameid: message.gameid,
+                    whiteplayer: whiteplayer.name,
+                    blackplayer: "You"
+                }));
                 this.games.push(game);
             }
             if (message.type === MOVE) {
-                const game = this.games.find(game => game.whiteplayer.socket === Socket || game.blackplayer.socket === Socket);
+                console.log("Move received:", message.payload);
+                const game = this.games.find(game => game.whiteplayer.id === id || game.blackplayer.id === id);
                 if (game) {
-                    game.makeMove(Socket, game.gameId, message.move);
+                    await game.makeMove(Socket, game.gameId, message.payload);
                 }
             }
             if (message.type === RESIGN) {
-                const game = this.games.find(game => game.whiteplayer.socket === Socket || game.blackplayer.socket === Socket);
+                const game = this.games.find(game => game.whiteplayer.id === id || game.blackplayer.id === id);
                 if (game) {
-                    game.makeresign(Socket, game.gameId);
+                    await game.makeresign(Socket, game.gameId);
                 }
             }
         })
         Socket.on("close", async () => {
-            const game = this.games.find(game => game.whiteplayer.socket === Socket || game.blackplayer.socket === Socket);
+            const user = this.Users.find(u => u.socket === Socket);
+            const game = this.games.find(g =>
+                g.whiteplayer.id === user?.id ||
+                g.blackplayer.id === user?.id
+            );
             if (!game) {
                 if (this.pendinguser?.socket === Socket) {
                     this.pendinguser = null;
@@ -189,7 +239,7 @@ export class GameManager {
                         for (let i = 0; i < pendinggame.players.length; i++) {
                             pendinggame.players[i]?.socket.send(JSON.stringify({
                                 gameid: pendinggame.gameid,
-                                game: game
+                                game: pendinggame
                             }))
                         }
                     }

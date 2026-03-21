@@ -4,6 +4,7 @@ import { MOVE, GAME_OVER } from "./messages.js";
 interface User {
     id: number,
     socket: WebSocket
+    name: string
 }
 import prisma from "./prismaclient.js";
 
@@ -38,7 +39,16 @@ export class Game {
     }
 
     async storeindb(result: string, reason: string, gameId: string) {
+        if (this.endTime === null) return;
         try {
+            const existing = await prisma.game.findUnique({
+            where: { id: gameId }
+        });
+
+        if (existing) {
+            console.log("Game already stored, skipping...");
+            return;
+        }
             const savedgame = await prisma.game.create({
                 data: {
                     id: gameId,
@@ -88,7 +98,9 @@ export class Game {
             this.moves.push(m.san);
             this.moveCount++;
             this.fenHistory.push(this.board.fen());
+            console.log("Move made:", move);
         } catch (e) {
+            console.log("Invalid move attempted:", move, "Error:", e);
             return;
         }
 
@@ -96,16 +108,19 @@ export class Game {
             JSON.stringify({
                 type: MOVE,
                 payload: move,
+                fen: this.board.fen()
             })
         );
         this.blackplayer.socket.send(
             JSON.stringify({
                 type: MOVE,
                 payload: move,
+                fen: this.board.fen()
             })
         );
 
         if (this.board.isGameOver()) {
+            if (this.endTime !== null) return;
             this.endTime = new Date();
 
             let result, reason;
@@ -134,7 +149,7 @@ export class Game {
         }
     }
     async makeresign(Socket: WebSocket, gameId: string) {
-
+        if (this.endTime !== null) return;  
         this.endTime = new Date();
         const opponent =
             Socket === this.whiteplayer.socket ? this.blackplayer : this.whiteplayer;
