@@ -32,8 +32,8 @@ export default function MainMenu({
       // if ws not ready, do nothing — don't navigate away
       return;
     }
-    if (selected === 1) console.log("Create Game - coming soon");
-    if (selected === 2) console.log("Join Game - coming soon");
+    if (selected === 1) goTo("create");
+     if (selected === 2) goTo("join");
     if (selected === 3) process.exit(0);
   }
 });
