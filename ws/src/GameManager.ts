@@ -131,6 +131,7 @@ export class GameManager {
                     gameid: gameId,
                     game: pendinggame
                 }))
+                
             }
             if (message.type === JOIN) {
                 const game = this.pendinggames.find(g => g.gameid === message.gameid);
@@ -152,10 +153,13 @@ export class GameManager {
                 game.players.push({ id: id, socket: Socket, name: name });
                 for (let i = 0; i < game.players.length; i++) {
                     game.players[i]?.socket.send(JSON.stringify({
+                        type:"player_joined",
+                        name: name,
                         gameid: game.gameid,
                         game: game
                     }))
                 }
+                
             }
             if (message.type === LEAVE) {
                 const game = this.pendinggames.find(g => g.gameid === message.gameid);
@@ -167,11 +171,14 @@ export class GameManager {
                 else {
                     for (let i = 0; i < game.players.length; i++) {
                         game.players[i]?.socket.send(JSON.stringify({
+                            type:"player_left",
+                            name: name,
                             gameid: game.gameid,
                             game: game
                         }))
                     }
                 }
+               
             }
             if (message.type === START) {
                 const pendinggame = this.pendinggames.find(g => g.gameid === message.gameid);
@@ -204,6 +211,7 @@ export class GameManager {
                     blackplayer: "You"
                 }));
                 this.games.push(game);
+               
             }
             if (message.type === MOVE) {
                 console.log("Move received:", message.payload);
