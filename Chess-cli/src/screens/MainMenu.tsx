@@ -1,8 +1,9 @@
+// src/screens/MainMenu.tsx
 import React, { useState } from "react";
 import { Box, Text, useInput } from "ink";
 import type { Screen } from "../App.js";
 
-const items = ["Play Game", "Create Game", "Join Game", "Exit"] as const;
+const items = ["Play Game", "Play vs Bot", "Create Game", "Join Game", "Exit"] as const;
 
 const MENU_ART = [
   "█▀▄▀█ █▀▀ █▄░█ █░█",
@@ -21,23 +22,22 @@ export default function MainMenu({
   const [selected, setSelected] = useState(0);
 
   useInput((_, key) => {
-  if (key.upArrow) setSelected((s) => Math.max(0, s - 1));
-  if (key.downArrow) setSelected((s) => Math.min(items.length - 1, s + 1));
-  if (key.return) {
-    if (selected === 0) {
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: "init_game" }));
-        goTo("waiting");
+    if (key.upArrow)   setSelected((s) => Math.max(0, s - 1));
+    if (key.downArrow) setSelected((s) => Math.min(items.length - 1, s + 1));
+    if (key.return) {
+      if (selected === 0) {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "init_game" }));
+          goTo("waiting");
+        }
+        return;
       }
-      // if ws not ready, do nothing — don't navigate away
-      return;
+      if (selected === 1) goTo("bot_difficulty");
+      if (selected === 2) goTo("create");
+      if (selected === 3) goTo("join");
+      if (selected === 4) process.exit(0);
     }
-    if (selected === 1) goTo("create");
-     if (selected === 2) goTo("join");
-    if (selected === 3) process.exit(0);
-  }
-});
-
+  });
 
   return (
     <Box
@@ -61,7 +61,7 @@ export default function MainMenu({
           <Text color="yellow">♖ ♕ ♔</Text>
         </Box>
 
-        {/* MENU heading */}
+        {/* Heading */}
         <Box flexDirection="column" alignItems="center" marginBottom={1}>
           {MENU_ART.map((line, i) => (
             <Text key={i} color="yellow" bold>{line}</Text>
@@ -73,7 +73,7 @@ export default function MainMenu({
           <Text italic dimColor>TERMINAL CHESS MASTER</Text>
         </Box>
 
-        {/* Logged in indicator */}
+        {/* Logged in */}
         {token && (
           <Box justifyContent="center" marginBottom={1}>
             <Text color="yellow" dimColor>♟  Logged in ✓</Text>

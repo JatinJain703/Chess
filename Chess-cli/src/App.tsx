@@ -8,12 +8,13 @@ import MainMenu from "./screens/MainMenu.js";
 import WaitingScreen from "./screens/WaitingScreen.js";
 import CreateGame from "./screens/CreateGame.js";
 import JoinGame from "./screens/JoinGame.js";
+import BotDifficulty from "./screens/BotDifficulty.js";
 import GameScreen from "./screens/GameScreen.js";
 import GameOverScreen from "./screens/GameOverScreen.js";
 
 export type Screen =
   | "auth" | "login" | "signup" | "menu"
-  | "waiting" | "create" | "join"
+  | "waiting" | "create" | "join" | "bot_difficulty"
   | "game" | "gameover";
 
 export interface GameInfo {
@@ -90,6 +91,7 @@ export default function App() {
       const data = JSON.parse(e.data);
 
       if (data.type === "GAME_START") {
+        // works for both normal and bot games
         const color = data.whiteplayer === "You" ? "white" : "black";
         playerColor.current = color;
         setGameInfo({
@@ -125,6 +127,12 @@ export default function App() {
     connectWS(t);
   };
 
+  const startBotGame = (difficulty: "Medium" | "Hard") => {
+    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+      ws.current.send(JSON.stringify({ type: "bot_start", difficulty }));
+    }
+  };
+
   if (connecting) return (
     <Box flexDirection="column" alignItems="center" marginTop={2}>
       <Text color="yellow">♟  Connecting to server...</Text>
@@ -139,13 +147,19 @@ export default function App() {
     />
   );
 
-  if (screen === "auth")     return <AuthMenu goTo={goTo} />;
-  if (screen === "login")    return <Login goTo={goTo} onSuccess={handleAuthSuccess} />;
-  if (screen === "signup")   return <Signup goTo={goTo} onSuccess={handleAuthSuccess} />;
-  if (screen === "menu")     return <MainMenu token={token} ws={ws.current} goTo={goTo} />;
-  if (screen === "waiting")  return <WaitingScreen ws={ws.current} goTo={goTo} />;
-  if (screen === "create")   return <CreateGame ws={ws.current} goTo={goTo} />;
-  if (screen === "join")     return <JoinGame ws={ws.current} goTo={goTo} />;
-  if (screen === "game")     return <GameScreen ws={ws.current} gameInfo={gameInfo!} fen={fen} goTo={goTo} />;
-  if (screen === "gameover") return <GameOverScreen gameOver={gameOver!} goTo={goTo} />;
+  if (screen === "auth")           return <AuthMenu goTo={goTo} />;
+  if (screen === "login")          return <Login goTo={goTo} onSuccess={handleAuthSuccess} />;
+  if (screen === "signup")         return <Signup goTo={goTo} onSuccess={handleAuthSuccess} />;
+  if (screen === "menu")           return <MainMenu token={token} ws={ws.current} goTo={goTo} />;
+  if (screen === "waiting")        return <WaitingScreen ws={ws.current} goTo={goTo} />;
+  if (screen === "create")         return <CreateGame ws={ws.current} goTo={goTo} />;
+  if (screen === "join")           return <JoinGame ws={ws.current} goTo={goTo} />;
+  if (screen === "bot_difficulty") return (
+    <BotDifficulty
+      goTo={goTo}
+      onSelect={(d) => startBotGame(d)}
+    />
+  );
+  if (screen === "game")           return <GameScreen ws={ws.current} gameInfo={gameInfo!} fen={fen} goTo={goTo} />;
+  if (screen === "gameover")       return <GameOverScreen gameOver={gameOver!} goTo={goTo} />;
 }
