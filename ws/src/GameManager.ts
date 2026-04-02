@@ -1,13 +1,26 @@
 import { Game } from "./Game.js";
 import WebSocket from "ws";
-import { INIT_GAME, MOVE, REGISTER_USER, RESIGN, REMOVE, CREATE, JOIN, LEAVE, START } from "./messages.js";
+import { INIT_GAME, MOVE, REGISTER_USER, RESIGN, REMOVE, CREATE, JOIN, LEAVE, START, BOT_START } from "./messages.js";
 import { v4 as uuidv4 } from "uuid";
 interface User {
     name: string,
     id: number,
     socket: WebSocket
 }
+import { type Bot, createBot } from "./Bot.js";
+type Player = User | Bot;
 
+function isUser(p: Player): p is User {
+    return (p as Bot).type !== "bot";
+}
+
+function isBot(p: Player): p is Bot {
+    return (p as Bot).type === "bot";
+}
+const DIFFICULTY = {
+    Medium: { skill: 10, movetime: 500 },
+    Hard: { skill: 15, movetime: 1000 },
+};
 interface pending {
     gameid: string,
     createdby: User,
@@ -43,7 +56,7 @@ export class GameManager {
         this.Users = this.Users.filter(user => user.socket !== Socket);
     }
     private async handlereconnect(user: User) {
-        const game = this.games.find(game => game.whiteplayer.id === user.id || game.blackplayer.id === user.id);
+        const game = this.games.find(game => game.whiteplayer.id === user.id || (isUser(game.blackplayer) && game.blackplayer.id === user.id));
         if (!game) {
             user.socket.send(JSON.stringify({ type: "error", message: "Game not found or already ended" }));
             return;
@@ -52,7 +65,7 @@ export class GameManager {
         if (game.whiteplayer.id === user.id) {
             game.whitedisconnectedAt = null;
             game.whiteplayer.socket = user.socket;
-        } else if (game.blackplayer.id === user.id) {
+        } else if ((isUser(game.blackplayer) && game.blackplayer.id === user.id)) {
             game.blackdisconnectedAt = null;
             game.blackplayer.socket = user.socket;
         }
@@ -91,22 +104,45 @@ export class GameManager {
                     this.games.push(game);
                     game.whiteplayer.socket.send(JSON.stringify({
                         type: "GAME_START",
-                        gameid:gameId,
+                        gameid: gameId,
                         whiteplayer: "You",
                         blackplayer: user.name
                     }));
-
-                    game.blackplayer.socket.send(JSON.stringify({
-                        type: "GAME_START",
-                        gameid:gameId,
-                        whiteplayer: pendingUser.name,
-                        blackplayer: "You"
-                    }));
+                    if (isUser(game.blackplayer)) {
+                        game.blackplayer.socket.send(JSON.stringify({
+                            type: "GAME_START",
+                            gameid: gameId,
+                            whiteplayer: pendingUser.name,
+                            blackplayer: "You"
+                        }));
+                    }
                     this.pendinguser = null;
                 }
                 else {
                     this.pendinguser = user;
                 }
+            }
+            if (message.type == BOT_START) {
+                const gameId = uuidv4();
+                const difficulty = (message.difficulty as keyof typeof DIFFICULTY) || "Medium";
+                const diff = DIFFICULTY[difficulty];
+                const bot = createBot(diff.skill, diff.movetime);
+
+                const user = this.Users.find(u => u.socket === Socket)
+                if (!user)
+                    return;
+                const game = new Game(user, bot, gameId, async (endedId) => {
+                    bot.engine.kill();
+                    this.games = this.games.filter(g => g.gameId !== endedId);
+                    console.log(`Game ${endedId} removed from active games`);
+                });
+                this.games.push(game);
+                game.whiteplayer.socket.send(JSON.stringify({
+                    type: "GAME_START",
+                    gameid: gameId,
+                    whiteplayer: "You",
+                    blackplayer: "Stockfish"
+                }));
             }
             if (message.type === REMOVE) {
                 console.log("Remove from queue:", id);
@@ -131,7 +167,7 @@ export class GameManager {
                     gameid: gameId,
                     game: pendinggame
                 }))
-                
+
             }
             if (message.type === JOIN) {
                 const game = this.pendinggames.find(g => g.gameid === message.gameid);
@@ -153,13 +189,13 @@ export class GameManager {
                 game.players.push({ id: id, socket: Socket, name: name });
                 for (let i = 0; i < game.players.length; i++) {
                     game.players[i]?.socket.send(JSON.stringify({
-                        type:"player_joined",
+                        type: "player_joined",
                         name: name,
                         gameid: game.gameid,
                         game: game
                     }))
                 }
-                
+
             }
             if (message.type === LEAVE) {
                 const game = this.pendinggames.find(g => g.gameid === message.gameid);
@@ -171,14 +207,14 @@ export class GameManager {
                 else {
                     for (let i = 0; i < game.players.length; i++) {
                         game.players[i]?.socket.send(JSON.stringify({
-                            type:"player_left",
+                            type: "player_left",
                             name: name,
                             gameid: game.gameid,
                             game: game
                         }))
                     }
                 }
-               
+
             }
             if (message.type === START) {
                 const pendinggame = this.pendinggames.find(g => g.gameid === message.gameid);
@@ -211,17 +247,17 @@ export class GameManager {
                     blackplayer: "You"
                 }));
                 this.games.push(game);
-               
+
             }
             if (message.type === MOVE) {
                 console.log("Move received:", message.payload);
-                const game = this.games.find(game => game.whiteplayer.id === id || game.blackplayer.id === id);
+                const game = this.games.find(game => game.whiteplayer.id === id || (isUser(game.blackplayer) && game.blackplayer.id === id));
                 if (game) {
                     await game.makeMove(Socket, game.gameId, message.payload);
                 }
             }
             if (message.type === RESIGN) {
-                const game = this.games.find(game => game.whiteplayer.id === id || game.blackplayer.id === id);
+                const game = this.games.find(game => game.whiteplayer.id === id || (isUser(game.blackplayer) && game.blackplayer.id === id));
                 if (game) {
                     await game.makeresign(Socket, game.gameId);
                 }
@@ -231,7 +267,7 @@ export class GameManager {
             const user = this.Users.find(u => u.socket === Socket);
             const game = this.games.find(g =>
                 g.whiteplayer.id === user?.id ||
-                g.blackplayer.id === user?.id
+                (isUser(g.blackplayer) && g.blackplayer.id === user?.id)
             );
             if (!game) {
                 if (this.pendinguser?.socket === Socket) {
@@ -271,7 +307,7 @@ export class GameManager {
                         return;
                     }
 
-                    if (game.whitedisconnectedAt && game.blackdisconnectedAt) {
+                    if (game.whitedisconnectedAt && isUser(game.blackplayer) && game.blackdisconnectedAt) {
                         console.log(`Both players disconnected in game ${game.gameId}`);
 
                         this.games = this.games.filter(g => g.gameId !== game.gameId);
@@ -288,7 +324,7 @@ export class GameManager {
                         this.removeUser(game.whiteplayer.socket);
                     }
 
-                    if (game.blackdisconnectedAt) {
+                    if (isUser(game.blackplayer) && game.blackdisconnectedAt) {
                         console.log(`Black resigned due to disconnect`);
                         await game.makeresign(game.blackplayer.socket, game.gameId);
                         this.removeUser(game.blackplayer.socket);
