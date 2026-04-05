@@ -11,5 +11,6 @@ app.use(express.json());
 app.use("/auth",signuprouter);
 app.use("/auth",loginrouter);
 
-app.listen(3000);
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`WS running on ${PORT}`));
 
