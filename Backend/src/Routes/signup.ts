@@ -51,27 +51,20 @@ router.post("/signup", async (req, res) => {
         const token = jwt.sign({
             id: user.id
         }, JWT_SECRET)
-       return res.json({
+        return res.json({
             token: token,
             message: "you are logged in"
         })
     } catch (e: any) {
-
-      console.log(e);
-        if (e instanceof Prisma.PrismaClientKnownRequestError) {
-
-            if (e.code === "P2002") {
-                return res.status(400).json({
-                    message: "Email already registered"
-                });
-            }
-
+        console.log(e);
+        if (e?.code === "P2002") {
+            return res.status(400).json({
+                message: "Email already registered"
+            });
         }
-
         return res.status(500).json({
             message: "Something went wrong in server"
         });
-
     }
 })
 
