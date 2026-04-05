@@ -48,70 +48,70 @@ export class Game {
         this.blackdisconnectedAt = null;
         this.disconnectTimer = null;
 
-       if (isBot(this.blackplayer)) {
-  const bot = this.blackplayer;
-  sendToEngine(bot, "uci");
-  sendToEngine(bot, "isready");
-  sendToEngine(bot, `setoption name Skill Level value ${bot.skill}`);
-}
+        if (isBot(this.blackplayer)) {
+            const bot = this.blackplayer;
+            sendToEngine(bot, "uci");
+            sendToEngine(bot, "isready");
+            sendToEngine(bot, `setoption name Skill Level value ${bot.skill}`);
+        }
     }
 
-   private makeBotMove(): Promise<void> {
-  return new Promise((resolve) => {
-    if (!isBot(this.blackplayer)) return resolve();
-    const bot = this.blackplayer;
+    private makeBotMove(): Promise<void> {
+        return new Promise((resolve) => {
+            if (!isBot(this.blackplayer)) return resolve();
+            const bot = this.blackplayer;
 
-    sendToEngine(bot, `position fen ${this.board.fen()}`);
-    sendToEngine(bot, `go movetime ${bot.movetime}`);
+            sendToEngine(bot, `position fen ${this.board.fen()}`);
+            sendToEngine(bot, `go movetime ${bot.movetime}`);
 
-    const handler = async (data: Buffer) => {
-      const lines = data.toString().split("\n");
-      for (const line of lines) {
-        if (!line.startsWith("bestmove")) continue;
+            const handler = async (data: Buffer) => {
+                const lines = data.toString().split("\n");
+               
+                for (const line of lines) {
+                    if (!line.startsWith("bestmove")) continue;
 
-        // remove listener immediately
-        bot.engine.stdout?.off("data", handler);
+                    bot.engine.stdout?.off("data", handler);
 
-        const bestMove = line.split(" ")[1];
-        if (!bestMove || bestMove === "(none)") return resolve();
+                    const bestMove = line.split(" ")[1];
+                    if (!bestMove || bestMove === "(none)") return resolve();
 
-        const from  = bestMove.slice(0, 2);
-        const to    = bestMove.slice(2, 4);
-        const promo = bestMove[4];
+                    const from = bestMove.slice(0, 2);
+                    const to = bestMove.slice(2, 4);
+                    const promo = bestMove[4];
 
-        try {
-          const m = this.board.move({ from, to, promotion: promo ?? "q" });
-          if (!m) return resolve();
+                    try {
+                        const m = this.board.move({ from, to, promotion: promo ?? "q" });
+                        if (!m) return resolve();
 
-          this.moves.push(m.san);
-          this.moveCount++;
-          this.fenHistory.push(this.board.fen());
+                        this.moves.push(m.san);
+                        this.moveCount++;
+                        this.fenHistory.push(this.board.fen());
 
-          this.whiteplayer.socket.send(JSON.stringify({
-            type: MOVE,
-            payload: { from, to },
-            fen: this.board.fen(),
-            turn: this.board.turn(),
-          }));
+                        this.whiteplayer.socket.send(JSON.stringify({
+                            type: MOVE,
+                            payload: { from, to },
+                            fen: this.board.fen(),
+                            turn: this.board.turn(),
+                        }));
 
-          if (this.board.isGameOver()) {
-            if (this.endTime !== null) return resolve();
-            this.endTime = new Date();
-            const { result, reason } = this.getResult();
-            await this.storeindb(result, reason, this.gameId);
-          }
-        } catch (e) {
-          console.log("Bot move error:", e);
-        }
+                        if (this.board.isGameOver()) {
+                            if (this.endTime !== null) return resolve();
+                            this.endTime = new Date();
+                            const { result, reason } = this.getResult();
+                            await this.storeindb(result, reason, this.gameId);
+                        }
+                    } catch (e) {
+                        console.log("Bot move error:", e);
+                    }
 
-        resolve();
-        return;
-      }
-    };
+                    resolve();
+                    return;
+                }
+            };
 
-    bot.engine.stdout?.on("data", handler);
-  });
-}
+            bot.engine.stdout?.on("data", handler);
+        });
+    }
     private getResult(): { result: string; reason: string } {
         if (this.board.isCheckmate()) {
             return {
@@ -183,7 +183,7 @@ export class Game {
     async makeMove(Socket: WebSocket, gameId: string, move: {
         from: string,
         to: string,
-        promotion?: "q" | "r" | "b" | "n"; 
+        promotion?: "q" | "r" | "b" | "n";
     }) {
         if (this.moveCount % 2 == 0 && Socket !== this.whiteplayer.socket)
             return;
@@ -200,7 +200,7 @@ export class Game {
                 piece?.type === "p" &&
                 (move.to[1] === "8" || move.to[1] === "1")
             ) {
-                finalMove.promotion = "q"; // default queen
+                finalMove.promotion = "q"; 
             }
             const m = this.board.move(finalMove);
             if (!m) return;

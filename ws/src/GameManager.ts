@@ -1,7 +1,8 @@
 import { Game } from "./Game.js";
 import WebSocket from "ws";
-import { INIT_GAME, MOVE, REGISTER_USER, RESIGN, REMOVE, CREATE, JOIN, LEAVE, START, BOT_START } from "./messages.js";
+import { INIT_GAME, MOVE, REGISTER_USER, RESIGN, REMOVE, CREATE, JOIN, LEAVE, START, BOT_START, ANALYZE_MOVE } from "./messages.js";
 import { v4 as uuidv4 } from "uuid";
+import { analyzeMove } from "./Bot.js";
 interface User {
     name: string,
     id: number,
@@ -141,7 +142,8 @@ export class GameManager {
                     type: "GAME_START",
                     gameid: gameId,
                     whiteplayer: "You",
-                    blackplayer: "Stockfish"
+                    blackplayer: "Stockfish",
+                    botmode:"true"
                 }));
             }
             if (message.type === REMOVE) {
@@ -260,6 +262,31 @@ export class GameManager {
                 const game = this.games.find(game => game.whiteplayer.id === id || (isUser(game.blackplayer) && game.blackplayer.id === id));
                 if (game) {
                     await game.makeresign(Socket, game.gameId);
+                }
+            }
+
+            if (message.type === ANALYZE_MOVE) {
+                const game = this.games.find(game => game.whiteplayer.id === id || (isUser(game.blackplayer) && game.blackplayer.id === id));
+                if (!game) return;
+                try {
+                    Socket.send(JSON.stringify({ type: "analyze_thinking"}));
+                     
+                    const analysis = await analyzeMove(
+                        game.board.fen(),
+                        { from: message.from, to: message.to }
+                    );
+                    
+                    if (!analysis) {
+                        Socket.send(JSON.stringify({ type: "analyze_result", error: "Illegal move" }));
+                        return;
+                    }
+                    Socket.send(JSON.stringify({
+                        type: "analyze_result",
+                        analysis,
+                    }));
+                } catch (e) {
+                    console.log("Error analyzing move:", e);
+                    Socket.send(JSON.stringify({ type: "analyze_result", error: "Error analyzing move" }));
                 }
             }
         })
