@@ -63,6 +63,7 @@ export default function App() {
   const [gameInfo, setGameInfo] = useState<GameInfo | null>(null);
   const [gameOver, setGameOver] = useState<GameOverInfo | null>(null);
   const [fen, setFen] = useState<string | null>(null);
+  const [isBotGame, setIsBotGame] = useState(false);
   const ws = useRef<WebSocket | null>(null);
   const playerColor = useRef<"white" | "black" | null>(null);
 
@@ -91,7 +92,7 @@ export default function App() {
       const data = JSON.parse(e.data);
 
       if (data.type === "GAME_START") {
-        // works for both normal and bot games
+        
         const color = data.whiteplayer === "You" ? "white" : "black";
         playerColor.current = color;
         setGameInfo({
@@ -100,6 +101,7 @@ export default function App() {
           whiteplayer: data.whiteplayer,
           blackplayer: data.blackplayer,
         });
+        setIsBotGame(data.botmode === "true");
         setFen(null);
         goTo("game");
       }
@@ -160,6 +162,6 @@ export default function App() {
       onSelect={(d) => startBotGame(d)}
     />
   );
-  if (screen === "game")           return <GameScreen ws={ws.current} gameInfo={gameInfo!} fen={fen} goTo={goTo} />;
+  if (screen === "game")           return <GameScreen ws={ws.current} gameInfo={gameInfo!} fen={fen} goTo={goTo} isBotGame={isBotGame}/>;
   if (screen === "gameover")       return <GameOverScreen gameOver={gameOver!} goTo={goTo} />;
 }
