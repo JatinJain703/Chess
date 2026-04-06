@@ -15,11 +15,13 @@
     "dotenv": "^17.2.1",
     "stockfish": "^18.0.7",
     "uuid": "^11.1.0",
-    "ws": "^8.18.3"
+    "ws": "^8.18.3",
+    "jsonwebtoken": "^9.0.2"
   },
   "devDependencies": {
     "@types/node": "^25.5.0",
     "@types/ws": "^8.18.1",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "@types/jsonwebtoken": "^9.0.10"
   }
 }
