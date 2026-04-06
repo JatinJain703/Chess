@@ -21,11 +21,11 @@ wss.on("connection", async (socket,Request) => {
     try {
         decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
     } catch (err) {
-        wss.close();
+        socket.close();
         return;
     }
     if (!decoded) {
-    wss.close();
+        socket.close();
     return;
    }
    const user= await prisma.user.findUnique({
@@ -33,7 +33,7 @@ wss.on("connection", async (socket,Request) => {
         id: decoded.id
     }   })
    if(!user)
-   {  wss.close();
+   {  socket.close();
     return; 
    }
    console.log(`User ${user.name} connected with id ${user.id}`);
