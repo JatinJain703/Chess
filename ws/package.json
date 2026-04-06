@@ -4,17 +4,15 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "generate": "prisma generate --schema=../prisma/schema.prisma",
+    "generate": "prisma generate",
     "build": "npm run generate && tsc -b",
     "dev": "npm run build && node dist/index.js",
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
     "@prisma/client": "^6.19.2",
     "chess.js": "^1.4.0",
     "dotenv": "^17.2.1",
-    "openai": "^6.33.0",
     "stockfish": "^18.0.7",
     "uuid": "^11.1.0",
     "ws": "^8.18.3"
