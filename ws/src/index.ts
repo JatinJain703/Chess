@@ -1,8 +1,10 @@
 import { WebSocketServer, WebSocket } from "ws";
 import { GameManager } from "./GameManager.js";
-const wss = new WebSocketServer({ port: 8080 });
+
 import dotenv from "dotenv"
 dotenv.config()
+const PORT = Number(process.env.PORT) || 8080;
+const wss = new WebSocketServer({ port: PORT});
 const JWT_SECRET = process.env.JWT_SECRET!;
 const gameManager = new GameManager();
 import prisma from "./prismaclient.js";
