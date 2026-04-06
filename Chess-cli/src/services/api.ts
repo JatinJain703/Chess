@@ -2,7 +2,7 @@ import axios from "axios";
 
 export async function signup(name: string, email: string, password: string) {
     try {
-        const resp = await axios.post("http://localhost:3000/auth/signup", { name, email, password });
+        const resp = await axios.post("https://chess-backend-50m2.onrender.com/auth/signup", { name, email, password });
         return resp.data.token;
     } catch (err: any) {
         if (err.response) {
@@ -16,7 +16,7 @@ export async function signup(name: string, email: string, password: string) {
 
 export async function login(email: string, password: string) {
     try {
-        const resp = await axios.post("http://localhost:3000/auth/login", { email, password });
+        const resp = await axios.post("https://chess-backend-50m2.onrender.com/auth/login", { email, password });
         return resp.data.token;
     } catch (err:any) {
         if (err.response) {

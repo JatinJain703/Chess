@@ -29,7 +29,7 @@ export interface GameOverInfo {
   reason: string;
 }
 
-const WS_URL = "ws://localhost:8080";
+const WS_URL = "https://chess-ws-i5ph.onrender.com";
 
 function WsErrorScreen({
   error, onRetry, onBack,
