@@ -4,7 +4,7 @@ import { Chess } from "chess.js";
 
 const require = createRequire(import.meta.url);
 
-const stockfishPath = require.resolve("stockfish/bin/stockfish-18-asm.js");
+const stockfishPath = require.resolve("stockfish/bin/stockfish-18.js");
 console.log("Stockfish path:", stockfishPath);
 export interface Bot {
     type: "bot";
