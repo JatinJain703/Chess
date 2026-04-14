@@ -137,7 +137,7 @@ function getEval(bot: Bot, fen: string): Promise<{
 }> {
     return new Promise((resolve) => {
         let lastInfo = { score: 0, mate: null as number | null, pv: [] as string[] };
-        
+
         sendToEngine(bot, "uci");
         const handler = (data: Buffer) => {
             const lines = data.toString().split("\n");
@@ -201,12 +201,12 @@ function classifyMove(
     evalBefore: number,
     evalAfter: number,
     turn: "w" | "b",
-    newlyAttackedOwnPieces: number   
+    newlyAttackedOwnPieces: number
 ): string {
     const delta = evalAfter - evalBefore;
 
     const hangingPenalty = newlyAttackedOwnPieces * 30;
-   
+
     const adjustedDelta = turn === "w"
         ? delta - hangingPenalty
         : delta + hangingPenalty;
@@ -240,28 +240,29 @@ export async function analyzeMove(
     const fenAfterMove = tempBefore.fen();
 
 
-    const botBefore = createBot(15, 1000);
-    const botAfter = createBot(15, 1000);
+    const botBefore = createBot(15, 500);
+    const botAfter = createBot(15, 500);
 
     try {
-        
-        const beforeResult = await getEval(botBefore, fenBeforeMove);
-        const afterResult = await getEval(botAfter, fenAfterMove);
-       
+        const [beforeResult, afterResult] = await Promise.all([
+            getEval(botBefore, fenBeforeMove),
+            getEval(botAfter, fenAfterMove),
+        ]);
+
         const normalizedBefore = turn === "b" ? -beforeResult.score : beforeResult.score;
         const turnAfter = turn === "w" ? "b" : "w";
         const normalizedAfter = turnAfter === "b" ? -afterResult.score : afterResult.score;
-       
+
         const beforeBoard = new Chess(fenBeforeMove);
         const afterBoard = new Chess(fenAfterMove);
         const attackedBefore = getAttackedPieces(beforeBoard);
         const attackedAfter = getAttackedPieces(afterBoard);
 
         const newlyAttacked = attackedAfter.filter(
-            p => !attackedBefore.includes(p) && p.startsWith("White")  
+            p => !attackedBefore.includes(p) && p.startsWith("White")
         );
         const defendedAfter = attackedBefore.filter(
-            p => !attackedAfter.includes(p) && p.startsWith("White")  
+            p => !attackedAfter.includes(p) && p.startsWith("White")
         );
 
         const bestMove = beforeResult.pv[0] ?? "";
@@ -285,7 +286,7 @@ export async function analyzeMove(
         }
 
         const feedback = generateCoachAnalysis(analysis);
-        
+
         return feedback;
 
     } finally {
