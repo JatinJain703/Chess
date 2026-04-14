@@ -18,9 +18,12 @@ wss.on("connection", async (socket,Request) => {
     const queryParams = new URLSearchParams(url.split('?')[1]);
     const token = queryParams.get('token') || " ";
     let decoded: JwtPayload;
+    console.log("Incoming token:", token);
     try {
         decoded = jwt.verify(token, JWT_SECRET) as JwtPayload;
+        console.log("Decoded token:", decoded);
     } catch (err) {
+        console.error("Token verification failed:", err);
         socket.close();
         return;
     }
