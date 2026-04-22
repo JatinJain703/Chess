@@ -66,7 +66,7 @@ export class Game {
 
             const handler = async (data: Buffer) => {
                 const lines = data.toString().split("\n");
-               
+
                 for (const line of lines) {
                     if (!line.startsWith("bestmove")) continue;
 
@@ -200,7 +200,7 @@ export class Game {
                 piece?.type === "p" &&
                 (move.to[1] === "8" || move.to[1] === "1")
             ) {
-                finalMove.promotion = "q"; 
+                finalMove.promotion = "q";
             }
             const m = this.board.move(finalMove);
             if (!m) return;
@@ -254,7 +254,9 @@ export class Game {
         } else {
             result = "1-0";
         }
-
+        if (isBot(this.blackplayer)) {
+            this.blackplayer.engine.kill();
+        }
         await this.storeindb(result, "resignation", gameId);
 
     }

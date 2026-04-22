@@ -143,7 +143,7 @@ export class GameManager {
                     gameid: gameId,
                     whiteplayer: "You",
                     blackplayer: "Stockfish",
-                    botmode:"true"
+                    botmode: "true"
                 }));
             }
             if (message.type === REMOVE) {
@@ -269,13 +269,13 @@ export class GameManager {
                 const game = this.games.find(game => game.whiteplayer.id === id || (isUser(game.blackplayer) && game.blackplayer.id === id));
                 if (!game) return;
                 try {
-                    Socket.send(JSON.stringify({ type: "analyze_thinking"}));
-                     
+                    Socket.send(JSON.stringify({ type: "analyze_thinking" }));
+
                     const analysis = await analyzeMove(
                         game.board.fen(),
                         { from: message.from, to: message.to }
                     );
-                    
+
                     if (!analysis) {
                         Socket.send(JSON.stringify({ type: "analyze_result", error: "Illegal move" }));
                         return;
@@ -296,6 +296,9 @@ export class GameManager {
                 g.whiteplayer.id === user?.id ||
                 (isUser(g.blackplayer) && g.blackplayer.id === user?.id)
             );
+            if (game && isBot(game.blackplayer)) {
+                game.blackplayer.engine.kill();
+            }
             if (!game) {
                 if (this.pendinguser?.socket === Socket) {
                     this.pendinguser = null;

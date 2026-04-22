@@ -135,8 +135,13 @@ function getEval(bot: Bot, fen: string): Promise<{
     mate: number | null;
     pv: string[];
 }> {
-    return new Promise((resolve) => {
+    return new Promise((resolve,reject) => {
         let lastInfo = { score: 0, mate: null as number | null, pv: [] as string[] };
+        
+        const timeout = setTimeout(() => {
+            bot.engine.stdout?.off("data", handler);
+            reject(new Error("Engine timed out"));
+        }, 8000); 
 
         sendToEngine(bot, "uci");
         const handler = (data: Buffer) => {
@@ -238,7 +243,6 @@ export async function analyzeMove(
     if (!san) return null;
 
     const fenAfterMove = tempBefore.fen();
-
 
     const botBefore = createBot(15, 500);
     const botAfter = createBot(15, 500);
