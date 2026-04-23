@@ -31,6 +31,11 @@ router.post("/login", async (req, res) => {
         })
         return;
     }
+    if(user.provider!=="local"){
+        return res.status(400).json({
+            message: "This account was created using a third-party provider"
+        })
+    }
     const passmatch = await bcrypt.compare(password, user.password!);
     if (!passmatch) {
         res.status(403).send({

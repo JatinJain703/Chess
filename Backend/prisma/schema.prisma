@@ -11,7 +11,9 @@ model User {
   id         Int    @id @default(autoincrement())
   name       String
   email      String @unique
-  password   String
+  password   String?
+  provider   String  @default("local")
+  providerId String? 
   blackGames Game[] @relation("BlackPlayer")
   whiteGames Game[] @relation("WhitePlayer")
   moves      Move[]
